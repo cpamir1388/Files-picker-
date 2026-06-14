@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FileVault - Upload & Share</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #050a14;
+      --bg2: #0a1628;
+      --card: #0d1f3c;
+      --accent: #00d4ff;
+      --accent2: #7b2fff;
+      --accent3: #ff2d78;
+      --text: #e8f4ff;
+      --muted: #4a6fa5;
+      --success: #00ff88;
+      --glow: 0 0 20px rgba(0,212,255,0.4);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+      padding: 20px;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: 
+        radial-gradient(ellipse at 20% 20%, rgba(123,47,255,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 80%, rgba(0,212,255,0.06) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .grid-bg {
+      position: fixed;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+      background-size: 50px 50px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .logo-icon {
+      font-size: 48px;
+      margin-bottom: 8px;
+      display: block;
+      filter: drop-shadow(0 0 16px var(--accent));
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .app-name {
+      font-family: 'Orbitron', monospace;
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 12px rgba(0,212,255,0.5));
+    }
+
+    .app-sub {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 13px;
+      letter-spacing: 6px;
+      color: var(--muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+    }
+
+    /* Upload Zone */
+    .upload-zone {
+      background: var(--card);
+      border: 2px dashed rgba(0,212,255,0.3);
+      border-radius: 20px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .upload-zone::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+    }
+
+    .upload-zone:hover {
+      border-color: var(--accent);
+      background: rgba(0,212,255,0.05);
+      transform: translateY(-2px);
+    }
+
+    .upload-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(0,212,255,0.1);
+      box-shadow: 0 0 30px rgba(0,212,255,0.2);
+    }
+
+    /* Mobile File Picker Buttons */
+    .picker-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 12px;
+      width: 100%;
+    }
+
+    .picker-btn {
+      background: var(--card);
+      border: 1px solid rgba(0,212,255,0.15);
+      border-radius: 16px;
+      padding: 16px 12px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 12px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .picker-btn::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+
+    .picker-btn:hover {
+      border-color: rgba(0,212,255,0.3);
+      background: rgba(0,212,255,0.05);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,212,255,0.15);
+    }
+
+    .picker-btn:active {
+      transform: translateY(0);
+    }
+
+    .picker-icon {
+      font-size: 28px;
+      filter: drop-shadow(0 0 8px rgba(0,212,255,0.2));
+    }
+
+    .picker-label {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .picker-btn:hover .picker-label {
+      color: var(--accent);
+    }
+
+    .upload-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      filter: drop-shadow(0 0 10px rgba(0,212,255,0.3));
+    }
+
+    .upload-text {
+      font-size: 16px;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .upload-hint {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 1px;
+    }
+
+    input[type="file"] { display: none; }
+
+    /* Progress */
+    .progress-container {
+      display: none;
+      gap: 12px;
+    }
+
+    .progress-container.active { display: flex; }
+
+    .progress-bar-wrapper {
+      flex: 1;
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      height: 30px;
+      overflow: hidden;
+      border: 1px solid rgba(0,212,255,0.2);
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%;
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--bg);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .progress-btn {
+      padding: 8px 16px;
+      background: rgba(255,45,120,0.15);
+      border: 1px solid rgba(255,45,120,0.3);
+      border-radius: 10px;
+      color: var(--accent3);
+      cursor: pointer;
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      transition: all 0.2s ease;
+    }
+
+    .progress-btn:hover {
+      background: rgba(255,45,120,0.25);
+      box-shadow: 0 0 12px rgba(255,45,120,0.3);
+    }
+
+    /* File List */
+    .files-section {
+      display: none;
+    }
+
+    .files-section.active { display: block; }
+
+    .section-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .files-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .files-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .files-list::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.2);
+      border-radius: 10px;
+    }
+
+    .files-list::-webkit-scrollbar-thumb {
+      background: rgba(0,212,255,0.3);
+      border-radius: 10px;
+    }
+
+    .files-list::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,212,255,0.5);
+    }
+
+    .file-item {
+      background: var(--card);
+      border: 1px solid rgba(0,212,255,0.1);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .file-item:hover {
+      border-color: rgba(0,212,255,0.3);
+      transform: translateX(-2px);
+    }
+
+    .file-item.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px rgba(0,212,255,0.15);
+    }
+
+    .file-item.active::before {
+      content: '';
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: linear-gradient(var(--accent), var(--accent2));
+    }
+
+    .file-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .file-info {
+      flex: 1;
+    }
+
+    .file-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      word-break: break-all;
+    }
+
+    .file-size {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .file-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .action-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(0,212,255,0.1);
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .action-btn:hover {
+      background: rgba(0,212,255,0.2);
+      box-shadow: 0 0 12px rgba(0,212,255,0.2);
+      transform: scale(1.1);
+    }
+
+    .action-btn.delete {
+      background: rgba(255,45,120,0.1);
+      color: var(--accent3);
+    }
+
+    .action-btn.delete:hover {
+      background: rgba(255,45,120,0.2);
+      box-shadow: 0 0 12px rgba(255,45,120,0.2);
+    }
+
+    /* Link Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal.active { display: flex; }
+
+    .modal-content {
+      background: var(--card);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 20px;
+      padding: 28px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+
+    .modal-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+      color: var(--accent);
+    }
+
+    .link-box {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 14px;
+      word-break: break-all;
+      font-size: 12px;
+      font-family: monospace;
+      color: var(--text);
+      direction: ltr;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .modal-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+    }
+
+    .modal-btn.copy {
+      background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,47,255,0.15));
+      border: 1px solid rgba(0,212,255,0.3);
+      color: var(--accent);
+    }
+
+    .modal-btn.copy:hover {
+      background: linear-gradient(135deg, rgba(0,212,255,0.25), rgba(123,47,255,0.25));
+      box-shadow: 0 0 16px rgba(0,212,255,0.2);
+    }
+
+    .modal-btn.close {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(0,212,255,0.1);
+      color: var(--muted);
+    }
+
+    .modal-btn.close:hover {
+      background: rgba(0,0,0,0.5);
+    }
+
+    /* Alert */
+    .alert {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: rgba(0,255,136,0.1);
+      border: 1px solid rgba(0,255,136,0.3);
+      color: var(--success);
+      font-size: 12px;
+      z-index: 200;
+      animation: slideIn 0.3s ease;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateY(-100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .alert.error {
+      background: rgba(255,45,120,0.1);
+      border-color: rgba(255,45,120,0.3);
+      color: var(--accent3);
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 20px;
+      border-top: 1px solid rgba(0,212,255,0.1);
+      margin-top: 20px;
+    }
+
+    .footer-text {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .footer-brand {
+      font-family: 'Orbitron', monospace;
+      font-size: 14px;
+      margin-top: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .footer-link {
+      color: #2aabee;
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .footer-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-bg"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <span class="logo-icon">📁</span>
+      <div class="app-name">FILEVAULT</div>
+      <div class="app-sub">Upload · Share · Secure</div>
+    </div>
+
+    <!-- Upload Zone -->
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-icon">⬆️</div>
+      <div class="upload-text">فایل را اینجا بندازید</div>
+      <div class="upload-hint">یا کلیک کنید برای انتخاب</div>
+      <input type="file" id="fileInput" multiple accept="*/*">
+    </div>
+
+    <!-- File Picker Buttons (Mobile) -->
+    <div class="picker-buttons">
+      <button class="picker-btn" onclick="pickFile('*/*')">
+        <span class="picker-icon">📁</span>
+        <span class="picker-label">انتخاب فایل</span>
+      </button>
+      <button class="picker-btn" onclick="pickFile('image/*')">
+        <span class="picker-icon">📸</span>
+        <span class="picker-label">عکس</span>
+      </button>
+      <button class="picker-btn" onclick="pickFile('video/*')">
+        <span class="picker-icon">🎬</span>
+        <span class="picker-label">ویدیو</span>
+      </button>
+      <button class="picker-btn" onclick="pickFile('.pdf,.doc,.docx,.txt,.xls,.xlsx')">
+        <span class="picker-icon">📄</span>
+        <span class="picker-label">سند</span>
+      </button>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-container" id="progressContainer">
+      <div class="progress-bar-wrapper">
+        <div class="progress-bar" id="progressBar">0%</div>
+      </div>
+      <button class="progress-btn" id="cancelBtn">لغو</button>
+    </div>
+
+    <!-- Files List -->
+    <div class="files-section" id="filesSection">
+      <h3 class="section-title">فایل‌های آپلود شده</h3>
+      <div class="files-list" id="filesList"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-text">ساخته شده توسط</div>
+      <div class="footer-brand">CPAMIR · <a href="https://t.me/BreadpitB" target="_blank" class="footer-link">@BreadpitB</a></div>
+    </div>
+  </div>
+
+  <!-- Link Modal -->
+  <div class="modal" id="linkModal">
+    <div class="modal-content">
+      <div class="modal-title">لینک دانلود</div>
+      <div class="link-box" id="linkBox"></div>
+      <div class="modal-actions">
+        <button class="modal-btn copy" id="copyBtn">کپی</button>
+        <button class="modal-btn close" id="closeModal">بستن</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Supabase Config
+    const SUPABASE_URL = 'https://edhwsyrpcrqtrdprblhd.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_n3co4Rn8oUHBpil85NJwZQ_cNrJ_LAs';
+    const BUCKET = 'files';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let uploadAbortController = null;
+    let currentLink = '';
+
+    // DOM Elements
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const filesList = document.getElementById('filesList');
+    const filesSection = document.getElementById('filesSection');
+    const linkModal = document.getElementById('linkModal');
+    const linkBox = document.getElementById('linkBox');
+    const copyBtn = document.getElementById('copyBtn');
+    const closeModalBtn = document.getElementById('closeModal');
+    const cancelBtn = document.getElementById('cancelBtn');
+
+    // File Picker Function
+    function pickFile(accept) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = accept;
+      input.multiple = true;
+      input.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+      });
+      input.click();
+    }
+
+    // Event Listeners
+    uploadZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleFileSelect);
+    uploadZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadZone.classList.add('dragover');
+    });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+      const files = e.dataTransfer.files;
+      handleFiles(files);
+    });
+
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(currentLink);
+      showAlert('لینک کپی شد! ✓', false);
+    });
+
+    closeModalBtn.addEventListener('click', () => linkModal.classList.remove('active'));
+    cancelBtn.addEventListener('click', cancelUpload);
+
+    // Functions
+    function handleFileSelect(e) {
+      handleFiles(e.target.files);
+    }
+
+    function handleFiles(files) {
+      Array.from(files).forEach(file => uploadFile(file));
+    }
+
+    async function uploadFile(file) {
+      if (!file.name) return;
+
+      uploadAbortController = new AbortController();
+      progressContainer.classList.add('active');
+
+      const fileName = `${Date.now()}-${file.name}`;
+      const filePath = `${BUCKET}/${fileName}`;
+
+      try {
+        const { error } = await supabase.storage
+          .from(BUCKET)
+          .upload(filePath, file, {
+            signal: uploadAbortController.signal,
+            onUploadProgress: (progress) => {
+              const percent = Math.round((progress.loaded / progress.total) * 100);
+              progressBar.style.width = percent + '%';
+              progressBar.textContent = percent + '%';
+            }
+          });
+
+        if (error) throw error;
+
+        progressContainer.classList.remove('active');
+        showAlert('فایل آپلود شد! ✓', false);
+        
+        fileInput.value = '';
+        loadFiles();
+
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          showAlert('خطا در آپلود: ' + err.message, true);
+        }
+        progressContainer.classList.remove('active');
+      }
+    }
+
+    async function loadFiles() {
+      try {
+        const { data, error } = await supabase.storage.from(BUCKET).list();
+        if (error) throw error;
+
+        filesList.innerHTML = '';
+        if (data.length === 0) {
+          filesSection.classList.remove('active');
+          return;
+        }
+
+        filesSection.classList.add('active');
+        
+        data.forEach(file => {
+          const item = document.createElement('div');
+          item.className = 'file-item';
+          
+          const icon = getFileIcon(file.name);
+          const size = formatFileSize(file.metadata?.size || 0);
+
+          const link = supabase.storage
+            .from(BUCKET)
+            .getPublicUrl(file.name).data.publicUrl;
+
+          item.innerHTML = `
+            <div class="file-icon">${icon}</div>
+            <div class="file-info">
+              <div class="file-name">${file.name.split('-').pop()}</div>
+              <div class="file-size">${size}</div>
+            </div>
+            <div class="file-actions">
+              <button class="action-btn" onclick="showLink('${link}')">🔗</button>
+              <button class="action-btn delete" onclick="deleteFile('${file.name}')">🗑️</button>
+            </div>
+          `;
+          filesList.appendChild(item);
+        });
+
+      } catch (err) {
+        showAlert('خطا: ' + err.message, true);
+      }
+    }
+
+    function showLink(link) {
+      currentLink = link;
+      linkBox.textContent = link;
+      linkModal.classList.add('active');
+    }
+
+    async function deleteFile(fileName) {
+      if (!confirm('مطمئن هستید؟')) return;
+
+      try {
+        const { error } = await supabase.storage.from(BUCKET).remove([fileName]);
+        if (error) throw error;
+        
+        showAlert('فایل حذف شد ✓', false);
+        loadFiles();
+      } catch (err) {
+        showAlert('خطا: ' + err.message, true);
+      }
+    }
+
+    function cancelUpload() {
+      if (uploadAbortController) {
+        uploadAbortController.abort();
+        progressContainer.classList.remove('active');
+        showAlert('آپلود لغو شد', false);
+      }
+    }
+
+    function getFileIcon(name) {
+      const ext = name.split('.').pop().toLowerCase();
+      const icons = {
+        pdf: '📄', doc: '📝', docx: '📝', txt: '📋',
+        jpg: '🖼️', png: '🖼️', gif: '🖼️', jpeg: '🖼️',
+        mp3: '🎵', mp4: '🎬', avi: '🎬',
+        zip: '📦', rar: '📦', 7z: '📦',
+        exe: '⚙️', apk: '📲', app: '📲'
+      };
+      return icons[ext] || '📄';
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function showAlert(msg, isError = false) {
+      const alert = document.createElement('div');
+      alert.className = 'alert' + (isError ? ' error' : '');
+      alert.textContent = msg;
+      document.body.appendChild(alert);
+      setTimeout(() => alert.remove(), 3000);
+    }
+
+    // Load files on startup
+    loadFiles();
+  </script>
+</body>
+</html>
